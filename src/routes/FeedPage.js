@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { graphql } from 'react-apollo';
+import { withState, lifecycle, compose } from 'recompose';
 
 import Feed from '../components/Feed';
 import Loading from '../components/Loading';
@@ -9,6 +10,9 @@ import FEED_QUERY from '../graphql/FeedQuery.graphql';
 import CURRENT_USER_QUERY from '../graphql/Profile.graphql';
 import VOTE_MUTATION from '../graphql/Vote.graphql';
 
+const LONG_POLL_INTERVAL = 5 * 1000;
+const SHORT_POLL_INTERVAL = 500;
+
 class FeedPage extends React.Component {
   constructor() {
     super();
@@ -16,10 +20,19 @@ class FeedPage extends React.Component {
   }
 
   render() {
-    const { vote, loading, currentUser, feed, fetchMore } = this.props;
+    const {
+      vote,
+      loading,
+      currentUser,
+      feed,
+      fetchMore,
+      setPollInterval,
+    } = this.props;
 
     return (
       <div>
+        <a onClick={() => setPollInterval(SHORT_POLL_INTERVAL)}>short</a>{' '}
+        <a onClick={() => setPollInterval(LONG_POLL_INTERVAL)}>long</a>
         <Feed
           entries={feed || []}
           loggedIn={!!currentUser}
@@ -43,11 +56,15 @@ FeedPage.propTypes = {
 };
 
 const ITEMS_PER_PAGE = 10;
-const withUser = graphql(CURRENT_USER_QUERY, {
-  props: ({ data }) => ({
-    currentUser: data && data.currentUser,
-  }),
-});
+const withUser = compose(
+  withState('pollInterval', 'setPollInterval', LONG_POLL_INTERVAL),
+  graphql(CURRENT_USER_QUERY, {
+    props: ({ data }) => ({
+      currentUser: data && data.currentUser,
+    }),
+    options: ({ pollInterval }) => ({ pollInterval }),
+  })
+);
 const withData = graphql(FEED_QUERY, {
   options: ({ match }) => ({
     variables: {
